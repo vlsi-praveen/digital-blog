@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Design | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="05_FSM_Design.html">← Prev</a>
+                <a href="07_Clock_Domain_Crossing.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 6 of 10</span>
+            <h1>Memory Design</h1>
+            <p class="subtitle">SRAM, ROM, FIFO, and Register Files</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,031</span> views
+            </div>
+        </div>
+
+        <h2>Memory Types Overview</h2>
+        <table>
+            <tr><th>Type</th><th>Volatile?</th><th>Read/Write</th><th>Speed</th><th>Use Case</th></tr>
+            <tr><td>SRAM</td><td>Yes</td><td>R/W</td><td>Fast</td><td>Cache, registers</td></tr>
+            <tr><td>DRAM</td><td>Yes</td><td>R/W</td><td>Slower</td><td>Main memory</td></tr>
+            <tr><td>ROM</td><td>No</td><td>Read only</td><td>Fast</td><td>Boot code, constants</td></tr>
+            <tr><td>Flash</td><td>No</td><td>R/W (slow)</td><td>Medium</td><td>Storage</td></tr>
+            <tr><td>Register File</td><td>Yes</td><td>R/W</td><td>Fastest</td><td>CPU registers</td></tr>
+        </table>
+
+        <h2>SRAM (Static RAM)</h2>
+        <p>Each bit stored in a flip-flop/latch circuit. No refresh needed.</p>
+
+<div class="diagram">SRAM Array Structure:
+
+         Word Line 0
+              │
+    ┌─────────┼─────────┐
+    │    ┌────┴────┐    │
+    │    │ 6T Cell │    │
+    │    └────┬────┘    │
+Bit │         │         │ Bit'
+Line│    ┌────┴────┐    │ Line
+    │    │ 6T Cell │    │
+    │    └────┬────┘    │
+    └─────────┼─────────┘
+              │
+         Word Line 1</div>
+
+        <h3>Simple SRAM Model</h3>
+<pre><code>// Single-port SRAM
+module sram #(
+    parameter DEPTH = 256,
+    parameter WIDTH = 8,
+    parameter ADDR_W = 8
+)(
+    input                clk,
+    input                we,      // Write enable
+    input  [ADDR_W-1:0]  addr,
+    input  [WIDTH-1:0]   din,
+    output reg [WIDTH-1:0] dout
+);
+    reg [WIDTH-1:0] mem [0:DEPTH-1];
+    
+    always @(posedge clk) begin
+        if (we)
+            mem[addr] <= din;
+        dout <= mem[addr];  // Read (1 cycle latency)
+    end
+endmodule</code></pre>
+
+        <h3>Dual-Port SRAM</h3>
+<pre><code>// True dual-port SRAM (both ports can read and write)
+module dual_port_sram #(
+    parameter DEPTH = 256,
+    parameter WIDTH = 8
+)(
+    input                clk,
+    // Port A
+    input                we_a,
+    input  [7:0]         addr_a,
+    input  [WIDTH-1:0]   din_a,
+    output reg [WIDTH-1:0] dout_a,
+    // Port B
+    input                we_b,
+    input  [7:0]         addr_b,
+    input  [WIDTH-1:0]   din_b,
+    output reg [WIDTH-1:0] dout_b
+);
+    reg [WIDTH-1:0] mem [0:DEPTH-1];
+    
+    // Port A
+    always @(posedge clk) begin
+        if (we_a)
+            mem[addr_a] <= din_a;
+        dout_a <= mem[addr_a];
+    end
+    
+    // Port B
+    always @(posedge clk) begin
+        if (we_b)
+            mem[addr_b] <= din_b;
+        dout_b <= mem[addr_b];
+    end
+endmodule</code></pre>
+
+        <h2>ROM (Read-Only Memory)</h2>
+        <p>Contents fixed at design time. Used for lookup tables, boot code.</p>
+
+<pre><code>// ROM using case statement
+module rom_16x8 (
+    input  [3:0] addr,
+    output reg [7:0] data
+);
+    always @(*) begin
+        case (addr)
+            4'h0: data = 8'h00;
+            4'h1: data = 8'h17;
+            4'h2: data = 8'h2E;
+            4'h3: data = 8'h44;
+            4'h4: data = 8'h58;
+            4'h5: data = 8'h6A;
+            4'h6: data = 8'h79;
+            4'h7: data = 8'h84;
+            4'h8: data = 8'h8C;
+            4'h9: data = 8'h90;
+            4'hA: data = 8'h91;
+            4'hB: data = 8'h8F;
+            4'hC: data = 8'h8A;
+            4'hD: data = 8'h81;
+            4'hE: data = 8'h76;
+            4'hF: data = 8'h69;
+        endcase
+    end
+endmodule
+
+// ROM using initialization file
+module rom_file #(
+    parameter DEPTH = 256,
+    parameter WIDTH = 8
+)(
+    input  [7:0] addr,
+    output [WIDTH-1:0] data
+);
+    reg [WIDTH-1:0] mem [0:DEPTH-1];
+    
+    initial begin
+        $readmemh("rom_data.hex", mem);
+    end
+    
+    assign data = mem[addr];
+endmodule</code></pre>
+
+        <h2>Register File</h2>
+        <p>Small, fast memory with multiple read/write ports. Core of CPU.</p>
+
+<pre><code>// Register File: 32 registers, 2 read ports, 1 write port
+module reg_file #(
+    parameter WIDTH = 32,
+    parameter DEPTH = 32,
+    parameter ADDR_W = 5
+)(
+    input                clk,
+    input                we,
+    input  [ADDR_W-1:0]  waddr,
+    input  [WIDTH-1:0]   wdata,
+    input  [ADDR_W-1:0]  raddr1, raddr2,
+    output [WIDTH-1:0]   rdata1, rdata2
+);
+    reg [WIDTH-1:0] regs [0:DEPTH-1];
+    
+    // Write (synchronous)
+    always @(posedge clk) begin
+        if (we && waddr != 0)  // Register 0 often hardwired to 0
+            regs[waddr] <= wdata;
+    end
+    
+    // Read (asynchronous - combinational)
+    assign rdata1 = (raddr1 == 0) ? 0 : regs[raddr1];
+    assign rdata2 = (raddr2 == 0) ? 0 : regs[raddr2];
+endmodule</code></pre>
+
+        <h2>FIFO (First-In First-Out)</h2>
+        <p>Queue memory - data comes out in the order it went in.</p>
+
+<div class="diagram">Write ──►┌─────────────────────┐──► Read
+         │ [D1][D2][D3][D4][ ] │
+         └─────────────────────┘
+              ↑           ↑
+           Write        Read
+           Pointer      Pointer
+           
+Write: Add data at write pointer, increment
+Read:  Get data at read pointer, increment</div>
+
+        <h3>Synchronous FIFO</h3>
+<pre><code>module sync_fifo #(
+    parameter WIDTH = 8,
+    parameter DEPTH = 16
+)(
+    input                clk, rst_n,
+    input                wr_en, rd_en,
+    input  [WIDTH-1:0]   din,
+    output [WIDTH-1:0]   dout,
+    output               full, empty,
+    output [4:0]         count
+);
+    localparam PTR_W = $clog2(DEPTH);
+    
+    reg [WIDTH-1:0] mem [0:DEPTH-1];
+    reg [PTR_W:0]   wr_ptr, rd_ptr;  // Extra bit for full/empty
+    
+    wire [PTR_W-1:0] wr_addr = wr_ptr[PTR_W-1:0];
+    wire [PTR_W-1:0] rd_addr = rd_ptr[PTR_W-1:0];
+    
+    // Write
+    always @(posedge clk) begin
+        if (wr_en && !full)
+            mem[wr_addr] <= din;
+    end
+    
+    // Read
+    assign dout = mem[rd_addr];
+    
+    // Pointers
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            wr_ptr <= 0;
+            rd_ptr <= 0;
+        end else begin
+            if (wr_en && !full)
+                wr_ptr <= wr_ptr + 1;
+            if (rd_en && !empty)
+                rd_ptr <= rd_ptr + 1;
+        end
+    end
+    
+    // Status flags
+    assign empty = (wr_ptr == rd_ptr);
+    assign full  = (wr_ptr[PTR_W] != rd_ptr[PTR_W]) && 
+                   (wr_ptr[PTR_W-1:0] == rd_ptr[PTR_W-1:0]);
+    assign count = wr_ptr - rd_ptr;
+endmodule</code></pre>
+
+        <h2>Memory Initialization</h2>
+<pre><code>// Method 1: Initial block
+reg [7:0] mem [0:255];
+initial begin
+    mem[0] = 8'hAB;
+    mem[1] = 8'hCD;
+    // ...
+end
+
+// Method 2: Read from file
+initial begin
+    $readmemh("data.hex", mem);     // Hex format
+    // or
+    $readmemb("data.bin", mem);     // Binary format
+end
+
+// data.hex file format:
+// AB
+// CD
+// 12
+// 34</code></pre>
+
+        <h2>Memory Access Patterns</h2>
+        
+        <h3>Read-First vs Write-First</h3>
+<pre><code>// Read-First: Read returns OLD value
+always @(posedge clk) begin
+    dout <= mem[addr];     // Read first
+    if (we)
+        mem[addr] <= din;  // Then write
+end
+
+// Write-First: Read returns NEW value  
+always @(posedge clk) begin
+    if (we)
+        mem[addr] <= din;  // Write first
+    dout <= mem[addr];     // Then read (new value)
+end
+
+// No-Change: Output unchanged during write
+always @(posedge clk) begin
+    if (we)
+        mem[addr] <= din;
+    else
+        dout <= mem[addr];
+end</code></pre>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Memory Type</th><th>Ports</th><th>Typical Use</th></tr>
+                <tr><td>Single-port SRAM</td><td>1 R/W</td><td>General storage</td></tr>
+                <tr><td>Dual-port SRAM</td><td>2 R/W</td><td>Buffers, caches</td></tr>
+                <tr><td>ROM</td><td>1 R</td><td>Constants, LUTs</td></tr>
+                <tr><td>Register File</td><td>Multi-port</td><td>CPU registers</td></tr>
+                <tr><td>FIFO</td><td>1W, 1R</td><td>Rate matching, buffering</td></tr>
+            </table>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="05_FSM_Design.html" class="nav-btn prev">← FSM Design</a>
+            <a href="07_Clock_Domain_Crossing.html" class="nav-btn next">Clock Domain Crossing →</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 6 of 10</p>
+    </div>
+</body>
+</html>

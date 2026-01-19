@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clock Domain Crossing | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="06_Memory_Design.html">← Prev</a>
+                <a href="08_Low_Power_Design.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 7 of 10</span>
+            <h1>Clock Domain Crossing</h1>
+            <p class="subtitle">Safely transfer data between different clock domains</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,127</span> views
+            </div>
+        </div>
+
+        <h2>The Problem</h2>
+        <p>When data crosses from one clock domain to another, timing relationships are unknown.</p>
+
+<div class="diagram">    Domain A (100 MHz)          Domain B (133 MHz)
+    
+    ┌────────┐                    ┌────────┐
+    │  FF_A  │────── DATA ───────►│  FF_B  │
+    └────┬───┘                    └────┬───┘
+         │                             │
+      CLK_A                         CLK_B
+      
+Problem: CLK_A and CLK_B are asynchronous!
+         Setup/hold times at FF_B may be violated.</div>
+
+        <h2>Metastability</h2>
+        <p>When setup/hold is violated, flip-flop output becomes <strong>unpredictable</strong>.</p>
+
+<div class="diagram">Normal:          Metastable:
+                 
+    ┌────            ────┐
+    │                    │ ← Stuck in middle!
+────┘                    └────
+                         
+Clean 0→1           May resolve to 0 or 1
+transition          after random delay</div>
+
+        <div class="warning">
+            <strong>Metastability can cause:</strong>
+            <ul>
+                <li>Different parts of chip seeing different values</li>
+                <li>Timing failures downstream</li>
+                <li>System crash or data corruption</li>
+            </ul>
+        </div>
+
+        <h2>Solution 1: Two-FF Synchronizer</h2>
+        <p>For <strong>single-bit signals</strong> (control signals, flags).</p>
+
+<div class="diagram">    CLK_A                           CLK_B
+      │                               │
+      ▼                               ▼
+  ┌──────┐                       ┌──────┐    ┌──────┐
+  │ FF_A │────── signal_a ──────►│ FF_1 │───►│ FF_2 │───► signal_b
+  └──────┘                       └──────┘    └──────┘
+                                   │           │
+                                 May be      Very likely
+                                 metastable   stable</div>
+
+<pre><code>// Two-FF Synchronizer
+module sync_2ff (
+    input      clk_b,       // Destination clock
+    input      rst_n,
+    input      signal_a,    // From clock domain A
+    output     signal_b     // Synchronized to clock domain B
+);
+    reg sync_ff1, sync_ff2;
+    
+    always @(posedge clk_b or negedge rst_n) begin
+        if (!rst_n) begin
+            sync_ff1 <= 1'b0;
+            sync_ff2 <= 1'b0;
+        end else begin
+            sync_ff1 <= signal_a;   // May go metastable
+            sync_ff2 <= sync_ff1;   // Very likely stable
+        end
+    end
+    
+    assign signal_b = sync_ff2;
+endmodule</code></pre>
+
+        <div class="tip">
+            Use 3-FF synchronizers for high-speed or safety-critical designs!
+        </div>
+
+        <h2>Solution 2: Gray Code for Counters</h2>
+        <p>For <strong>multi-bit values</strong> that change slowly (like FIFO pointers).</p>
+
+<div class="diagram">Binary counting:    Gray code counting:
+  
+000 → 001 → 010     000 → 001 → 011
+      ↑                   ↑
+  2 bits change!      1 bit changes!
+  
+Problem with binary: If 2 bits change and one synchronizes 
+before the other, you get a wrong intermediate value!
+
+Gray code: Only 1 bit changes at a time - safe to synchronize!</div>
+
+        <h3>Gray Code Conversion</h3>
+<pre><code>// Binary to Gray
+function [N-1:0] bin2gray;
+    input [N-1:0] bin;
+    bin2gray = bin ^ (bin >> 1);
+endfunction
+
+// Gray to Binary
+function [N-1:0] gray2bin;
+    input [N-1:0] gray;
+    integer i;
+    begin
+        gray2bin[N-1] = gray[N-1];
+        for (i = N-2; i >= 0; i = i-1)
+            gray2bin[i] = gray2bin[i+1] ^ gray[i];
+    end
+endfunction</code></pre>
+
+        <h3>Async FIFO Pointer Crossing</h3>
+<pre><code>// Write pointer synchronized to read domain
+module ptr_sync (
+    input            rd_clk, rst_n,
+    input  [PTR_W:0] wr_ptr,      // Binary pointer
+    output [PTR_W:0] wr_ptr_sync  // Synchronized (gray)
+);
+    wire [PTR_W:0] wr_ptr_gray;
+    reg  [PTR_W:0] sync1, sync2;
+    
+    // Convert to Gray in write domain (not shown: use wr_clk)
+    assign wr_ptr_gray = wr_ptr ^ (wr_ptr >> 1);
+    
+    // Synchronize Gray pointer to read domain
+    always @(posedge rd_clk or negedge rst_n) begin
+        if (!rst_n) begin
+            sync1 <= 0;
+            sync2 <= 0;
+        end else begin
+            sync1 <= wr_ptr_gray;
+            sync2 <= sync1;
+        end
+    end
+    
+    assign wr_ptr_sync = sync2;
+endmodule</code></pre>
+
+        <h2>Solution 3: Handshake Protocol</h2>
+        <p>For <strong>multi-bit data transfers</strong> that happen occasionally.</p>
+
+<div class="diagram">Domain A                          Domain B
+
+1. A puts data on bus, raises REQ
+         ────── data ──────►
+         ────── req ───────►
+         
+2. B synchronizes REQ, latches data, raises ACK
+         ◄────── ack ──────
+         
+3. A sees ACK (synchronized), lowers REQ
+         ────── req=0 ─────►
+         
+4. B sees REQ low, lowers ACK
+         ◄───── ack=0 ──────
+         
+5. Transfer complete, ready for next</div>
+
+<pre><code>// Handshake - Sender side (Domain A)
+module hs_sender (
+    input            clk_a, rst_n,
+    input            send,
+    input  [7:0]     data_in,
+    output reg       busy,
+    output reg [7:0] data_out,
+    output reg       req,
+    input            ack_sync    // ACK synchronized to clk_a
+);
+    localparam IDLE = 2'd0;
+    localparam WAIT_ACK = 2'd1;
+    localparam WAIT_ACK_LOW = 2'd2;
+    
+    reg [1:0] state;
+    
+    always @(posedge clk_a or negedge rst_n) begin
+        if (!rst_n) begin
+            state <= IDLE;
+            req <= 0;
+            busy <= 0;
+        end else begin
+            case (state)
+                IDLE: begin
+                    if (send) begin
+                        data_out <= data_in;
+                        req <= 1;
+                        busy <= 1;
+                        state <= WAIT_ACK;
+                    end
+                end
+                WAIT_ACK: begin
+                    if (ack_sync) begin
+                        req <= 0;
+                        state <= WAIT_ACK_LOW;
+                    end
+                end
+                WAIT_ACK_LOW: begin
+                    if (!ack_sync) begin
+                        busy <= 0;
+                        state <= IDLE;
+                    end
+                end
+            endcase
+        end
+    end
+endmodule</code></pre>
+
+        <h2>Solution 4: Async FIFO</h2>
+        <p>Best solution for <strong>streaming data</strong> between clock domains.</p>
+
+<div class="diagram">    CLK_WR                              CLK_RD
+      │                                   │
+      ▼                                   ▼
+  ┌───────┐     ┌─────────────┐      ┌───────┐
+  │ Write │────►│   Memory    │─────►│ Read  │
+  │ Logic │     │  (Dual-Port)│      │ Logic │
+  └───┬───┘     └─────────────┘      └───┬───┘
+      │                                   │
+      │         ┌─────────────┐           │
+      └────────►│ wr_ptr_gray │──►sync───►│ (empty calc)
+                └─────────────┘           │
+                ┌─────────────┐           │
+      │◄─sync◄──│ rd_ptr_gray │◄──────────┘
+      │         └─────────────┘
+  (full calc)</div>
+
+        <h2>Common CDC Mistakes</h2>
+        
+        <table>
+            <tr><th>Mistake</th><th>Problem</th><th>Solution</th></tr>
+            <tr><td>No synchronizer</td><td>Metastability</td><td>Use 2-FF sync</td></tr>
+            <tr><td>Multi-bit sync with binary</td><td>Wrong values</td><td>Use Gray code</td></tr>
+            <tr><td>Combo logic between sync FFs</td><td>Defeats purpose</td><td>Direct FF-to-FF</td></tr>
+            <tr><td>Synchronizing same signal twice</td><td>Inconsistency</td><td>Sync once, distribute</td></tr>
+            <tr><td>Fast pulse crossing slow domain</td><td>Missed pulse</td><td>Use handshake</td></tr>
+        </table>
+
+        <h2>CDC Verification</h2>
+        <p>Tools like Synopsys SpyGlass or Cadence Conformal check for CDC issues:</p>
+        <ul>
+            <li>Missing synchronizers</li>
+            <li>Multi-bit signals without Gray coding</li>
+            <li>Reconvergence issues</li>
+            <li>FIFO pointer problems</li>
+        </ul>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Signal Type</th><th>Solution</th></tr>
+                <tr><td>Single-bit control</td><td>2-FF synchronizer</td></tr>
+                <tr><td>Counter/pointer</td><td>Gray code + sync</td></tr>
+                <tr><td>Occasional multi-bit</td><td>Handshake protocol</td></tr>
+                <tr><td>Streaming data</td><td>Async FIFO</td></tr>
+            </table>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="06_Memory_Design.html" class="nav-btn prev">← Memory Design</a>
+            <a href="08_Low_Power_Design.html" class="nav-btn next">Low Power Design →</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 7 of 10</p>
+    </div>
+</body>
+</html>

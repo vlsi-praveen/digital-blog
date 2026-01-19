@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Basics | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="09_RTL_Coding.html">← Prev</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 10 of 10</span>
+            <h1>Verification Basics</h1>
+            <p class="subtitle">Testbenches, simulation, and proving your design works</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,008</span> views
+            </div>
+        </div>
+
+        <h2>Why Verification?</h2>
+        <p>Verification typically takes <strong>60-70%</strong> of project time!</p>
+        <ul>
+            <li>Find bugs before silicon (fixing bugs in silicon costs millions)</li>
+            <li>Ensure design meets specification</li>
+            <li>Cover corner cases</li>
+        </ul>
+
+        <h2>Testbench Structure</h2>
+<div class="diagram">┌────────────────────────────────────────────────┐
+│                 Testbench                      │
+│                                                │
+│    ┌──────────┐        ┌──────────────────┐   │
+│    │ Stimulus │───────►│      DUT         │   │
+│    │Generator │        │ (Design Under    │   │
+│    └──────────┘        │     Test)        │   │
+│                        └────────┬─────────┘   │
+│                                 │             │
+│    ┌──────────┐                 │             │
+│    │ Monitor/ │◄────────────────┘             │
+│    │ Checker  │                               │
+│    └──────────┘                               │
+│                                                │
+└────────────────────────────────────────────────┘</div>
+
+        <h2>Simple Testbench</h2>
+<pre><code>module counter_tb;
+    // Testbench signals
+    reg        clk;
+    reg        rst_n;
+    reg        enable;
+    wire [3:0] count;
+    
+    // Instantiate DUT
+    counter4 dut (
+        .clk    (clk),
+        .rst_n  (rst_n),
+        .enable (enable),
+        .count  (count)
+    );
+    
+    // Clock generation
+    initial clk = 0;
+    always #5 clk = ~clk;  // 100MHz (10ns period)
+    
+    // Stimulus
+    initial begin
+        // Initialize
+        rst_n = 0;
+        enable = 0;
+        
+        // Reset
+        #20;
+        rst_n = 1;
+        
+        // Enable counting
+        #10;
+        enable = 1;
+        
+        // Let it count
+        #200;
+        
+        // Disable
+        enable = 0;
+        #50;
+        
+        // End simulation
+        $display("Test completed!");
+        $finish;
+    end
+    
+    // Monitor
+    initial begin
+        $monitor("Time=%0t rst_n=%b enable=%b count=%d",
+                 $time, rst_n, enable, count);
+    end
+    
+    // Waveform dump (for viewing in waveform viewer)
+    initial begin
+        $dumpfile("counter.vcd");
+        $dumpvars(0, counter_tb);
+    end
+endmodule</code></pre>
+
+        <h2>Self-Checking Testbench</h2>
+<pre><code>module adder_tb;
+    reg  [7:0] a, b;
+    reg        cin;
+    wire [7:0] sum;
+    wire       cout;
+    
+    // Expected values
+    reg [8:0] expected;
+    integer errors;
+    
+    // DUT
+    adder8 dut (
+        .a(a), .b(b), .cin(cin),
+        .sum(sum), .cout(cout)
+    );
+    
+    initial begin
+        errors = 0;
+        
+        // Test all combinations (exhaustive for small designs)
+        for (a = 0; a < 256; a = a + 1) begin
+            for (b = 0; b < 256; b = b + 1) begin
+                for (cin = 0; cin < 2; cin = cin + 1) begin
+                    #1;  // Wait for combinational logic
+                    
+                    expected = a + b + cin;
+                    
+                    if ({cout, sum} !== expected) begin
+                        $display("ERROR: a=%d b=%d cin=%d, got %d, expected %d",
+                                 a, b, cin, {cout, sum}, expected);
+                        errors = errors + 1;
+                    end
+                end
+            end
+        end
+        
+        // Report
+        if (errors == 0)
+            $display("TEST PASSED!");
+        else
+            $display("TEST FAILED with %d errors", errors);
+            
+        $finish;
+    end
+endmodule</code></pre>
+
+        <h2>Clock and Reset Generation</h2>
+<pre><code>// Method 1: Initial + always
+initial clk = 0;
+always #5 clk = ~clk;
+
+// Method 2: Forever loop
+initial begin
+    clk = 0;
+    forever #5 clk = ~clk;
+end
+
+// Method 3: Parameterized
+parameter CLK_PERIOD = 10;
+initial clk = 0;
+always #(CLK_PERIOD/2) clk = ~clk;
+
+// Reset generation
+initial begin
+    rst_n = 0;
+    repeat(5) @(posedge clk);  // Hold reset for 5 clocks
+    rst_n = 1;
+end</code></pre>
+
+        <h2>Tasks and Functions</h2>
+<pre><code>// Task: Can have delays, multiple outputs
+task write_data;
+    input [7:0] data;
+    input [3:0] addr;
+    begin
+        @(posedge clk);
+        wr_en <= 1;
+        wr_addr <= addr;
+        wr_data <= data;
+        @(posedge clk);
+        wr_en <= 0;
+    end
+endtask
+
+// Usage
+initial begin
+    write_data(8'hAB, 4'h0);
+    write_data(8'hCD, 4'h1);
+end
+
+// Function: No delays, single output
+function [7:0] expected_result;
+    input [7:0] a, b;
+    begin
+        expected_result = a ^ b;  // XOR for example
+    end
+endfunction</code></pre>
+
+        <h2>System Tasks</h2>
+<pre><code>// Display and monitoring
+$display("Value = %d", value);        // Print once
+$monitor("clk=%b data=%h", clk, data); // Print on change
+$strobe("At end of timestep: %d", x);  // Print at end of timestep
+
+// Time
+$time      // Current simulation time (integer)
+$realtime  // Current simulation time (real)
+
+// File I/O
+integer fd;
+fd = $fopen("output.txt", "w");
+$fdisplay(fd, "Data: %h", data);
+$fclose(fd);
+
+// Waveform
+$dumpfile("waves.vcd");
+$dumpvars(0, testbench);  // Dump all signals
+
+// Control
+$finish;   // End simulation
+$stop;     // Pause simulation (for debugging)</code></pre>
+
+        <h2>Assertions (SystemVerilog)</h2>
+<pre><code>// Immediate assertion
+always @(posedge clk) begin
+    assert (count < 16) else $error("Count overflow!");
+end
+
+// Concurrent assertions
+// Check that valid is followed by ready within 5 cycles
+property valid_handshake;
+    @(posedge clk) valid |-> ##[1:5] ready;
+endproperty
+
+assert property (valid_handshake)
+    else $error("Handshake timeout!");
+
+// Cover property (for coverage)
+cover property (@(posedge clk) state == ERROR);
+</code></pre>
+
+        <h2>Code Coverage</h2>
+        <p>Measures how much of your design was exercised:</p>
+
+        <table>
+            <tr><th>Type</th><th>What It Measures</th></tr>
+            <tr><td>Line Coverage</td><td>Which lines executed</td></tr>
+            <tr><td>Branch Coverage</td><td>Which if/else branches taken</td></tr>
+            <tr><td>Toggle Coverage</td><td>Which signals toggled 0→1 and 1→0</td></tr>
+            <tr><td>FSM Coverage</td><td>Which states visited, transitions taken</td></tr>
+            <tr><td>Condition Coverage</td><td>Boolean sub-expressions</td></tr>
+        </table>
+
+        <h2>Random Testing</h2>
+<pre><code>// Basic random
+initial begin
+    repeat(1000) begin
+        data = $random;           // 32-bit random
+        addr = $urandom_range(0, 255);  // Range 0-255
+        #10;
+        check_result();
+    end
+end
+
+// Constrained random (SystemVerilog)
+class Transaction;
+    rand bit [7:0] addr;
+    rand bit [31:0] data;
+    
+    constraint valid_addr { addr < 100; }
+    constraint aligned { data[1:0] == 0; }
+endclass
+
+Transaction t = new();
+t.randomize();</code></pre>
+
+        <h2>Testbench Checklist</h2>
+        <table>
+            <tr><th>Item</th><th>Description</th></tr>
+            <tr><td>✓ Clock generation</td><td>Correct frequency</td></tr>
+            <tr><td>✓ Reset sequence</td><td>Proper initialization</td></tr>
+            <tr><td>✓ Stimulus</td><td>Cover normal and edge cases</td></tr>
+            <tr><td>✓ Self-checking</td><td>Compare with expected values</td></tr>
+            <tr><td>✓ Error reporting</td><td>Clear pass/fail indication</td></tr>
+            <tr><td>✓ Timeout</td><td>Prevent infinite simulation</td></tr>
+            <tr><td>✓ Waveform dump</td><td>For debugging</td></tr>
+        </table>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Concept</th><th>Key Point</th></tr>
+                <tr><td>Testbench</td><td>Stimulus + DUT + Checker</td></tr>
+                <tr><td>Self-checking</td><td>Compare actual vs expected</td></tr>
+                <tr><td>Tasks</td><td>Reusable stimulus sequences</td></tr>
+                <tr><td>Assertions</td><td>Check design properties</td></tr>
+                <tr><td>Coverage</td><td>Measure test completeness</td></tr>
+            </table>
+        </div>
+
+        <div style="background: linear-gradient(135deg, #1a4a3a, #1e2a4a); border: 2px solid #ffd700; border-radius: 15px; padding: 30px; margin: 40px 0; text-align: center;">
+            <h2 style="color: #ffd700; margin-bottom: 15px;">🎉 Congratulations!</h2>
+            <p style="font-size: 1.2em;">You've completed the Digital Design Blog Series!</p>
+            <p>You now have a solid foundation in digital design concepts.</p>
+            <a href="index.html" class="nav-btn" style="margin-top: 20px; display: inline-block;">← Back to All Articles</a>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="09_RTL_Coding.html" class="nav-btn prev">← RTL Coding</a>
+            <a href="index.html" class="nav-btn next">All Articles</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 10 of 10 | The End</p>
+    </div>
+</body>
+</html>

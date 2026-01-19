@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FSM Design | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="04_Timing_Analysis.html">← Prev</a>
+                <a href="06_Memory_Design.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 5 of 10</span>
+            <h1>FSM Design</h1>
+            <p class="subtitle">Finite State Machines - the controllers of digital systems</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,073</span> views
+            </div>
+        </div>
+
+        <h2>What is an FSM?</h2>
+        <p><strong>Finite State Machine</strong> - a circuit that moves through defined states based on inputs.</p>
+        <p>Used for: controllers, protocols, sequencers, pattern detectors.</p>
+
+<div class="diagram">        ┌────────────────────────────────────────┐
+        │              FSM                       │
+        │  ┌──────┐         ┌───────────┐       │
+Input ──┼─►│ Next │────────►│  State    │       │
+        │  │State │         │ Register  │──┬───►│──► Output
+        │  │Logic │◄────────│ (FFs)     │  │    │
+        │  └──────┘         └───────────┘  │    │
+        │      ▲                           │    │
+        │      └───────────────────────────┘    │
+        │            Feedback                   │
+        └────────────────────────────────────────┘</div>
+
+        <h2>Moore vs Mealy</h2>
+
+        <table>
+            <tr><th>Moore Machine</th><th>Mealy Machine</th></tr>
+            <tr><td>Output depends on STATE only</td><td>Output depends on STATE + INPUT</td></tr>
+            <tr><td>Output changes with state</td><td>Output can change immediately with input</td></tr>
+            <tr><td>More states typically</td><td>Fewer states typically</td></tr>
+            <tr><td>Easier to design</td><td>Can be faster (one clock earlier)</td></tr>
+            <tr><td>Glitch-free outputs</td><td>May have glitches</td></tr>
+        </table>
+
+        <h3>Moore Example</h3>
+<div class="diagram">         ┌──────────┐
+         │  STATE   │───► Output
+         └──────────┘
+         Output = f(state) only</div>
+
+        <h3>Mealy Example</h3>
+<div class="diagram">         ┌──────────┐
+Input ──►│  STATE   │───► Output
+         └──────────┘
+         Output = f(state, input)</div>
+
+        <h2>FSM Design Steps</h2>
+        <ol>
+            <li>Understand the problem</li>
+            <li>Draw state diagram</li>
+            <li>Choose state encoding</li>
+            <li>Write state transition table</li>
+            <li>Implement in Verilog</li>
+        </ol>
+
+        <h2>Example: Sequence Detector (101)</h2>
+        <p>Detect the pattern "101" in a serial input stream.</p>
+
+        <h3>State Diagram</h3>
+<div class="diagram">                    0
+              ┌──────────────┐
+              │              │
+              ▼    1         │
+          ┌──────┐      ┌──────┐
+   reset─►│ IDLE │─────►│  S1  │
+          │      │      │      │
+          └──────┘      └──┬───┘
+              ▲    0       │
+              │    ┌───────┘
+              │    ▼
+              │ ┌──────┐      1 + output=1
+              │ │  S2  │───────────┐
+              │ │      │           │
+              │ └──────┘           │
+              │    │               │
+              └────┘               │
+                 1                 │
+              ┌────────────────────┘
+              ▼
+          (back to S1 for overlapping)</div>
+
+        <h3>State Transition Table</h3>
+        <table>
+            <tr><th>Current State</th><th>Input</th><th>Next State</th><th>Output</th></tr>
+            <tr><td>IDLE</td><td>0</td><td>IDLE</td><td>0</td></tr>
+            <tr><td>IDLE</td><td>1</td><td>S1</td><td>0</td></tr>
+            <tr><td>S1</td><td>0</td><td>S2</td><td>0</td></tr>
+            <tr><td>S1</td><td>1</td><td>S1</td><td>0</td></tr>
+            <tr><td>S2</td><td>0</td><td>IDLE</td><td>0</td></tr>
+            <tr><td>S2</td><td>1</td><td>S1</td><td>1 (detected!)</td></tr>
+        </table>
+
+        <h3>Verilog Implementation</h3>
+<pre><code>module seq_detector_101 (
+    input      clk, rst_n,
+    input      din,
+    output reg detected
+);
+    // State encoding
+    localparam IDLE = 2'b00;
+    localparam S1   = 2'b01;
+    localparam S2   = 2'b10;
+    
+    reg [1:0] state, next_state;
+    
+    // State register (sequential)
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            state <= IDLE;
+        else
+            state <= next_state;
+    end
+    
+    // Next state logic (combinational)
+    always @(*) begin
+        next_state = state;  // Default: stay
+        case (state)
+            IDLE: next_state = din ? S1 : IDLE;
+            S1:   next_state = din ? S1 : S2;
+            S2:   next_state = din ? S1 : IDLE;
+        endcase
+    end
+    
+    // Output logic (Mealy - depends on state AND input)
+    always @(*) begin
+        detected = (state == S2) && din;
+    end
+endmodule</code></pre>
+
+        <h2>State Encoding</h2>
+
+        <h3>Binary Encoding</h3>
+<pre><code>3 states need 2 bits:
+IDLE = 2'b00
+S1   = 2'b01
+S2   = 2'b10
+
+Pros: Minimum flip-flops
+Cons: More combinational logic</code></pre>
+
+        <h3>One-Hot Encoding</h3>
+<pre><code>3 states need 3 bits (one per state):
+IDLE = 3'b001
+S1   = 3'b010
+S2   = 3'b100
+
+Pros: Faster, simpler next-state logic
+Cons: More flip-flops</code></pre>
+
+        <h3>Gray Encoding</h3>
+<pre><code>Adjacent states differ by 1 bit:
+IDLE = 2'b00
+S1   = 2'b01
+S2   = 2'b11
+S3   = 2'b10
+
+Pros: Reduces glitches
+Cons: Limited to specific sequences</code></pre>
+
+        <h2>FSM Design Template</h2>
+<pre><code>module fsm_template (
+    input      clk, rst_n,
+    input      [N-1:0] inputs,
+    output reg [M-1:0] outputs
+);
+    // State declaration
+    localparam STATE_A = 0;
+    localparam STATE_B = 1;
+    localparam STATE_C = 2;
+    
+    reg [1:0] state, next_state;
+    
+    // 1. State Register (sequential)
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            state <= STATE_A;  // Reset state
+        else
+            state <= next_state;
+    end
+    
+    // 2. Next State Logic (combinational)
+    always @(*) begin
+        next_state = state;  // Default
+        case (state)
+            STATE_A: begin
+                if (condition1)
+                    next_state = STATE_B;
+            end
+            STATE_B: begin
+                if (condition2)
+                    next_state = STATE_C;
+                else
+                    next_state = STATE_A;
+            end
+            STATE_C: begin
+                next_state = STATE_A;
+            end
+            default: next_state = STATE_A;
+        endcase
+    end
+    
+    // 3. Output Logic
+    // Moore style (based on state only):
+    always @(*) begin
+        case (state)
+            STATE_A: outputs = ...;
+            STATE_B: outputs = ...;
+            STATE_C: outputs = ...;
+            default: outputs = ...;
+        endcase
+    end
+endmodule</code></pre>
+
+        <h2>Practical Example: Traffic Light Controller</h2>
+<pre><code>module traffic_light (
+    input      clk, rst_n,
+    output reg [2:0] light  // {RED, YELLOW, GREEN}
+);
+    localparam RED    = 2'd0;
+    localparam GREEN  = 2'd1;
+    localparam YELLOW = 2'd2;
+    
+    reg [1:0] state;
+    reg [3:0] timer;
+    
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            state <= RED;
+            timer <= 0;
+        end else begin
+            timer <= timer + 1;
+            case (state)
+                RED: begin
+                    if (timer == 10) begin  // 10 clocks
+                        state <= GREEN;
+                        timer <= 0;
+                    end
+                end
+                GREEN: begin
+                    if (timer == 8) begin   // 8 clocks
+                        state <= YELLOW;
+                        timer <= 0;
+                    end
+                end
+                YELLOW: begin
+                    if (timer == 2) begin   // 2 clocks
+                        state <= RED;
+                        timer <= 0;
+                    end
+                end
+            endcase
+        end
+    end
+    
+    // Output logic (Moore)
+    always @(*) begin
+        case (state)
+            RED:    light = 3'b100;
+            GREEN:  light = 3'b001;
+            YELLOW: light = 3'b010;
+            default: light = 3'b100;
+        endcase
+    end
+endmodule</code></pre>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Concept</th><th>Key Point</th></tr>
+                <tr><td>FSM</td><td>States + Transitions + Outputs</td></tr>
+                <tr><td>Moore</td><td>Output = f(state)</td></tr>
+                <tr><td>Mealy</td><td>Output = f(state, input)</td></tr>
+                <tr><td>Binary encode</td><td>Fewer FFs, more logic</td></tr>
+                <tr><td>One-hot</td><td>More FFs, faster logic</td></tr>
+                <tr><td>3 blocks</td><td>State reg, next state, output</td></tr>
+            </table>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="04_Timing_Analysis.html" class="nav-btn prev">← Timing Analysis</a>
+            <a href="06_Memory_Design.html" class="nav-btn next">Memory Design →</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 5 of 10</p>
+    </div>
+</body>
+</html>

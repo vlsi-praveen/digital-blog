@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Low Power Design | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="07_Clock_Domain_Crossing.html">← Prev</a>
+                <a href="09_RTL_Coding.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 8 of 10</span>
+            <h1>Low Power Design</h1>
+            <p class="subtitle">Reduce power consumption in digital circuits</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,065</span> views
+            </div>
+        </div>
+
+        <h2>Why Power Matters</h2>
+        <ul>
+            <li><strong>Battery life</strong> - mobile devices, IoT</li>
+            <li><strong>Heat</strong> - more power = more cooling needed</li>
+            <li><strong>Reliability</strong> - heat reduces chip lifespan</li>
+            <li><strong>Cost</strong> - packaging, cooling, electricity</li>
+        </ul>
+
+        <h2>Power Components</h2>
+
+        <h3>Total Power = Dynamic + Static</h3>
+
+<pre><code>P_total = P_dynamic + P_static
+
+P_dynamic = α × C × V² × f
+  α = Activity factor (switching probability)
+  C = Capacitance
+  V = Supply voltage
+  f = Clock frequency
+
+P_static = I_leak × V
+  I_leak = Leakage current (transistors "off" but still leaking)</code></pre>
+
+        <h2>Technique 1: Clock Gating</h2>
+        <p><strong>Turn off clock to unused logic.</strong> Most common power-saving technique.</p>
+
+<div class="diagram">Without clock gating:        With clock gating:
+
+CLK ──────► FF                       ┌─────┐
+                                CLK ─┤ AND ├──► Gated CLK ──► FF
+Even when not needed,                │     │
+FF toggles every cycle!          EN ─┤     │
+                                     └─────┘
+                                     
+                                When EN=0, clock stops → No toggling!</div>
+
+        <h3>RTL Clock Gating</h3>
+<pre><code>// Bad: Clock runs even when data doesn't change
+always @(posedge clk) begin
+    if (enable)
+        q <= d;
+end
+
+// Good: Let synthesis tool insert clock gating
+// Most tools automatically convert the above to gated clock
+
+// Explicit clock gating (if needed)
+wire gated_clk;
+assign gated_clk = clk & enable;  // Simple but glitchy!
+
+// Better: Latch-based clock gate (glitch-free)
+module clock_gate (
+    input      clk,
+    input      enable,
+    output     gated_clk
+);
+    reg enable_latched;
+    
+    // Latch enable on falling edge (when clock is low)
+    always @(clk or enable)
+        if (!clk)
+            enable_latched <= enable;
+    
+    assign gated_clk = clk & enable_latched;
+endmodule</code></pre>
+
+        <h2>Technique 2: Power Gating</h2>
+        <p><strong>Turn off power to unused blocks completely.</strong></p>
+
+<div class="diagram">         VDD
+          │
+    ┌─────┴─────┐
+    │  Header   │ ← Power switch (PMOS)
+    │  Switch   │
+    └─────┬─────┘
+          │ Virtual VDD
+    ┌─────┴─────┐
+    │           │
+    │  Logic    │ ← Block being gated
+    │  Block    │
+    │           │
+    └─────┬─────┘
+          │
+         GND
+
+When switch OFF: No power, no leakage!
+Trade-off: Wake-up time to restore state.</div>
+
+        <h3>Retention Registers</h3>
+        <p>Special flip-flops that keep state even when power is off:</p>
+<pre><code>// Retention FF concept
+// Before power-off: SAVE signal stores data to always-on register
+// After power-on: RESTORE signal brings data back
+
+// Tool handles this automatically with UPF/CPF</code></pre>
+
+        <h2>Technique 3: Multi-Vt Cells</h2>
+        <p>Use different threshold voltage transistors:</p>
+
+        <table>
+            <tr><th>Cell Type</th><th>Speed</th><th>Leakage</th><th>Use For</th></tr>
+            <tr><td>LVT (Low Vt)</td><td>Fast</td><td>High</td><td>Critical paths only</td></tr>
+            <tr><td>SVT (Standard)</td><td>Medium</td><td>Medium</td><td>Most logic</td></tr>
+            <tr><td>HVT (High Vt)</td><td>Slow</td><td>Low</td><td>Non-critical paths</td></tr>
+        </table>
+
+<div class="diagram">Critical Path:    LVT ──► LVT ──► LVT ──► FF
+                  (fast, leaky)
+                  
+Non-critical:     HVT ──► HVT ──► HVT ──► FF
+                  (slow, low leak)
+                  
+Synthesis tools do this automatically!</div>
+
+        <h2>Technique 4: Voltage Scaling</h2>
+
+        <h3>DVFS (Dynamic Voltage and Frequency Scaling)</h3>
+        <p>Lower voltage and frequency when full performance not needed.</p>
+
+<pre><code>Power ∝ V² × f
+
+If you reduce V by 50% and f by 50%:
+  New power = (0.5)² × 0.5 = 0.125 = 12.5% of original!
+
+Used in: Mobile processors, laptops</code></pre>
+
+        <h3>Multi-Voltage Design</h3>
+        <p>Different blocks run at different voltages:</p>
+<div class="diagram">┌───────────────┐   ┌───────────────┐
+│    CPU Core   │   │     Cache     │
+│    (1.0V)     │   │    (0.8V)     │
+└───────┬───────┘   └───────┬───────┘
+        │                   │
+        └────── Level ──────┘
+               Shifters
+               (voltage interface)</div>
+
+        <h2>Technique 5: Operand Isolation</h2>
+        <p>Prevent unnecessary switching in datapath.</p>
+
+<pre><code>// Bad: Multiplier inputs toggle even when not used
+always @(posedge clk) begin
+    if (mul_enable)
+        result <= a * b;  // Multiplier sees a,b changes always
+end
+
+// Good: Isolate operands when not computing
+wire [31:0] a_iso = mul_enable ? a : 32'b0;
+wire [31:0] b_iso = mul_enable ? b : 32'b0;
+
+always @(posedge clk) begin
+    if (mul_enable)
+        result <= a_iso * b_iso;  // Inputs stable when disabled
+end</code></pre>
+
+        <h2>Technique 6: Memory Power Optimization</h2>
+
+<pre><code>// Memory is often the biggest power consumer!
+
+1. Memory Banking
+   - Divide into banks, access only needed bank
+   
+2. Memory Shutdown
+   - Power off unused memory blocks
+   
+3. Retention Mode
+   - Ultra-low power mode that keeps data</code></pre>
+
+        <h2>RTL Coding for Low Power</h2>
+
+<pre><code>// 1. Avoid unnecessary toggling
+// Bad:
+assign out = enable ? data : 32'hAAAA_AAAA;  // Toggles when disabled!
+// Good:
+assign out = enable ? data : 32'b0;          // Stable when disabled
+
+// 2. Use one-hot encoding for low-activity signals
+// Gray code for counters that cross clock domains
+
+// 3. Minimize glitches
+// Bad: Deep combinational logic with different path delays
+// Good: Balance paths or add pipeline stages
+
+// 4. Reset only what's needed
+// Don't reset datapath registers if not needed
+
+// 5. Use enable conditions
+always @(posedge clk) begin
+    if (process_enable) begin
+        // Only do work when needed
+        result <= complex_operation(data);
+    end
+end</code></pre>
+
+        <h2>Power Analysis Flow</h2>
+<pre><code>1. RTL Simulation
+   └── Generate activity file (SAIF, VCD)
+   
+2. Synthesis
+   └── Map to standard cells
+   
+3. Power Analysis
+   └── Tool: PrimeTime PX, Voltus
+   └── Input: Netlist + Activity + Library
+   └── Output: Power report
+
+Key metrics:
+- Total power
+- Leakage power
+- Switching power
+- Power by hierarchy/module</code></pre>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Technique</th><th>Reduces</th><th>Complexity</th></tr>
+                <tr><td>Clock Gating</td><td>Dynamic</td><td>Low</td></tr>
+                <tr><td>Power Gating</td><td>Static + Dynamic</td><td>High</td></tr>
+                <tr><td>Multi-Vt</td><td>Static</td><td>Low</td></tr>
+                <tr><td>Voltage Scaling</td><td>Both</td><td>Medium</td></tr>
+                <tr><td>Operand Isolation</td><td>Dynamic</td><td>Low</td></tr>
+            </table>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="07_Clock_Domain_Crossing.html" class="nav-btn prev">← Clock Domain Crossing</a>
+            <a href="09_RTL_Coding.html" class="nav-btn next">RTL Coding →</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 8 of 10</p>
+    </div>
+</body>
+</html>

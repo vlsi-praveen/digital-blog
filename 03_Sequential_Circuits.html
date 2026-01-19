@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequential Circuits | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="02_Combinational_Circuits.html">← Prev</a>
+                <a href="04_Timing_Analysis.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 3 of 10</span>
+            <h1>Sequential Circuits</h1>
+            <p class="subtitle">Circuits with memory - the building blocks of registers</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,018</span> views
+            </div>
+        </div>
+
+        <h2>Sequential vs Combinational</h2>
+        
+        <table>
+            <tr><th>Combinational</th><th>Sequential</th></tr>
+            <tr><td>No memory</td><td>Has memory (storage)</td></tr>
+            <tr><td>Output = f(inputs)</td><td>Output = f(inputs + state)</td></tr>
+            <tr><td>No clock needed</td><td>Usually clocked</td></tr>
+            <tr><td>MUX, Adder, Decoder</td><td>Flip-flop, Counter, FSM</td></tr>
+        </table>
+
+        <h2>Latch vs Flip-Flop</h2>
+        <p>Both store 1 bit, but behave differently:</p>
+        
+        <table>
+            <tr><th>Latch</th><th>Flip-Flop</th></tr>
+            <tr><td>Level-sensitive</td><td>Edge-sensitive</td></tr>
+            <tr><td>Transparent when enabled</td><td>Samples only on clock edge</td></tr>
+            <tr><td>Simpler, less area</td><td>More predictable timing</td></tr>
+            <tr><td>Avoid in synchronous design</td><td>Preferred for synchronous design</td></tr>
+        </table>
+
+        <h2>SR Latch</h2>
+        <p>Set-Reset latch. Basic memory element.</p>
+
+<div class="diagram">        ┌─────────┐
+  S ────┤         ├──── Q
+        │ SR      │
+  R ────┤ Latch   ├──── Q'
+        └─────────┘
+
+S  R │ Q(next)  │ Action
+─────┼──────────┼─────────
+0  0 │ Q        │ Hold
+0  1 │ 0        │ Reset
+1  0 │ 1        │ Set
+1  1 │ Invalid! │ Both outputs go 0</div>
+
+        <div class="warning">
+            S=R=1 is forbidden - creates invalid state!
+        </div>
+
+        <h2>D Latch</h2>
+        <p>Data latch. Avoids invalid state of SR latch.</p>
+
+<div class="diagram">        ┌─────────┐
+  D ────┤         ├──── Q
+        │ D Latch │
+  EN ───┤         ├──── Q'
+        └─────────┘
+
+When EN=1: Q follows D (transparent)
+When EN=0: Q holds last value (latched)</div>
+
+<pre><code>// D Latch (avoid in synchronous designs!)
+module d_latch (
+    input  d, en,
+    output reg q
+);
+    always @(*) begin
+        if (en)
+            q = d;  // Transparent when enabled
+    end
+endmodule</code></pre>
+
+        <h2>D Flip-Flop</h2>
+        <p><strong>The most important sequential element!</strong></p>
+        <p>Samples D input only at the rising (or falling) edge of clock.</p>
+
+<div class="diagram">        ┌─────────┐
+  D ────┤         ├──── Q
+        │  D FF   │
+  CLK ──┤ >       ├──── Q'
+        └─────────┘
+        
+CLK ──────────┬───────────┬───────
+              │           │
+              ▲           ▲
+           Sample      Sample
+           D here      D here</div>
+
+<pre><code>// D Flip-Flop (preferred!)
+module dff (
+    input      clk,
+    input      d,
+    output reg q
+);
+    always @(posedge clk) begin
+        q <= d;  // Sample D at rising edge only
+    end
+endmodule
+
+// With async reset
+module dff_reset (
+    input      clk,
+    input      rst_n,  // Active-low reset
+    input      d,
+    output reg q
+);
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            q <= 1'b0;  // Async reset
+        else
+            q <= d;
+    end
+endmodule</code></pre>
+
+        <h2>JK Flip-Flop</h2>
+        <p>Like SR, but J=K=1 toggles output (no invalid state).</p>
+
+<div class="diagram">J  K │ Q(next)  │ Action
+─────┼──────────┼─────────
+0  0 │ Q        │ Hold
+0  1 │ 0        │ Reset
+1  0 │ 1        │ Set
+1  1 │ Q'       │ Toggle</div>
+
+        <h2>T Flip-Flop</h2>
+        <p>Toggle flip-flop. Toggles on every clock when T=1.</p>
+
+<div class="diagram">T │ Q(next)  │ Action
+──┼──────────┼─────────
+0 │ Q        │ Hold
+1 │ Q'       │ Toggle</div>
+
+<pre><code>// T Flip-Flop
+module tff (
+    input      clk, rst_n,
+    input      t,
+    output reg q
+);
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            q <= 1'b0;
+        else if (t)
+            q <= ~q;  // Toggle
+    end
+endmodule</code></pre>
+
+        <h2>Register</h2>
+        <p>Multiple flip-flops grouped together. Stores multi-bit data.</p>
+
+<pre><code>// 8-bit Register
+module register8 (
+    input            clk, rst_n,
+    input            load,
+    input      [7:0] d,
+    output reg [7:0] q
+);
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            q <= 8'b0;
+        else if (load)
+            q <= d;
+    end
+endmodule</code></pre>
+
+        <h2>Shift Register</h2>
+        <p>Data shifts through flip-flops on each clock.</p>
+
+<div class="diagram">Serial In ──► [FF0] ──► [FF1] ──► [FF2] ──► [FF3] ──► Serial Out
+
+Clock 1: Din→FF0, FF0→FF1, FF1→FF2, FF2→FF3
+Clock 2: New Din→FF0, old FF0→FF1, ...</div>
+
+<pre><code>// 8-bit Shift Register
+module shift_reg (
+    input            clk, rst_n,
+    input            serial_in,
+    output           serial_out,
+    output reg [7:0] parallel_out
+);
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            parallel_out <= 8'b0;
+        else
+            parallel_out <= {parallel_out[6:0], serial_in};  // Shift left
+    end
+    
+    assign serial_out = parallel_out[7];  // MSB out
+endmodule</code></pre>
+
+        <h2>Counter</h2>
+        <p>Counts up or down on each clock.</p>
+
+        <h3>Binary Counter</h3>
+<pre><code>// 4-bit Up Counter
+module counter4 (
+    input            clk, rst_n,
+    input            enable,
+    output reg [3:0] count
+);
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            count <= 4'b0;
+        else if (enable)
+            count <= count + 1;
+    end
+endmodule
+
+// Up/Down Counter
+module updown_counter (
+    input            clk, rst_n,
+    input            enable, up,
+    output reg [3:0] count
+);
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            count <= 4'b0;
+        else if (enable) begin
+            if (up)
+                count <= count + 1;
+            else
+                count <= count - 1;
+        end
+    end
+endmodule</code></pre>
+
+        <h3>Ring Counter</h3>
+<div class="diagram">Only one bit is 1, rotates through positions:
+0001 → 0010 → 0100 → 1000 → 0001 → ...</div>
+
+        <h3>Johnson Counter</h3>
+<div class="diagram">Twisted ring counter (inverted feedback):
+0000 → 1000 → 1100 → 1110 → 1111 → 0111 → 0011 → 0001 → 0000</div>
+
+        <h2>Edge Detection</h2>
+        <p>Detect rising or falling edge of a signal.</p>
+
+<pre><code>// Rising Edge Detector
+module edge_detect (
+    input      clk, rst_n,
+    input      signal,
+    output     rise,
+    output     fall
+);
+    reg signal_d;  // Delayed version
+    
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            signal_d <= 1'b0;
+        else
+            signal_d <= signal;
+    end
+    
+    assign rise = signal & ~signal_d;   // Was 0, now 1
+    assign fall = ~signal & signal_d;   // Was 1, now 0
+endmodule</code></pre>
+
+<div class="diagram">signal    ─────┐     ┌─────────────┐     ┌───
+               │     │             │     │
+               └─────┘             └─────┘
+
+signal_d  ──────┐     ┌─────────────┐     ┌──
+                │     │             │     │
+                └─────┘             └─────┘
+
+rise      ──────┐ ┌─────────────────┐ ┌──────
+                │ │                 │ │
+           ─────┴─┴─────────────────┴─┴──────
+
+The pulse lasts exactly one clock cycle!</div>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Element</th><th>Behavior</th><th>Use Case</th></tr>
+                <tr><td>Latch</td><td>Level-sensitive</td><td>Avoid if possible</td></tr>
+                <tr><td>D FF</td><td>Edge-sensitive</td><td>Standard storage</td></tr>
+                <tr><td>Register</td><td>Multi-bit storage</td><td>Data holding</td></tr>
+                <tr><td>Shift Reg</td><td>Serial ↔ Parallel</td><td>Serial comm</td></tr>
+                <tr><td>Counter</td><td>Count up/down</td><td>Timing, addressing</td></tr>
+            </table>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="02_Combinational_Circuits.html" class="nav-btn prev">← Combinational Circuits</a>
+            <a href="04_Timing_Analysis.html" class="nav-btn next">Timing Analysis →</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 3 of 10</p>
+    </div>
+</body>
+</html>

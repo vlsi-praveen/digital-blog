@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTL Coding Guidelines | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="08_Low_Power_Design.html">← Prev</a>
+                <a href="10_Verification_Basics.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 9 of 10</span>
+            <h1>RTL Coding Guidelines</h1>
+            <p class="subtitle">Write clean, synthesizable Verilog</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,094</span> views
+            </div>
+        </div>
+
+        <h2>Golden Rules</h2>
+        <ol>
+            <li>Synthesizable code only (no delays, no initial blocks for synthesis)</li>
+            <li>Use non-blocking (<=) for sequential, blocking (=) for combinational</li>
+            <li>Complete sensitivity lists (use @(*))</li>
+            <li>No latches (always assign all outputs in all branches)</li>
+            <li>One clock, one edge per always block</li>
+        </ol>
+
+        <h2>Naming Conventions</h2>
+<pre><code>// Signals
+input_data          // Input signals
+output_valid        // Output signals  
+internal_count      // Internal signals
+next_state          // Combinational "next" values
+
+// Active-low signals
+rst_n              // Active-low reset
+cs_n               // Active-low chip select
+
+// Clock and reset
+clk                // Clock
+clk_100mhz         // Specific clock
+rst_n              // Async reset (active low)
+sync_rst           // Sync reset
+
+// Parameters
+parameter WIDTH = 8;
+localparam STATE_IDLE = 2'b00;  // Local to module
+
+// Prefixes/Suffixes
+_d, _q             // D input, Q output of FF
+_ff                // Registered version
+_sync              // Synchronized signal
+_gray              // Gray-coded value</code></pre>
+
+        <h2>Module Structure Template</h2>
+<pre><code>module module_name #(
+    parameter WIDTH = 8,
+    parameter DEPTH = 16
+)(
+    // Clock and Reset
+    input                   clk,
+    input                   rst_n,
+    
+    // Input interface
+    input                   valid_in,
+    input  [WIDTH-1:0]      data_in,
+    output                  ready_out,
+    
+    // Output interface
+    output reg              valid_out,
+    output reg [WIDTH-1:0]  data_out,
+    input                   ready_in
+);
+
+    //=========================================
+    // Local Parameters
+    //=========================================
+    localparam PTR_WIDTH = $clog2(DEPTH);
+    
+    //=========================================
+    // Internal Signals
+    //=========================================
+    reg  [WIDTH-1:0]  data_reg;
+    wire [WIDTH-1:0]  data_next;
+    
+    //=========================================
+    // Combinational Logic
+    //=========================================
+    assign data_next = data_in + 1;
+    
+    //=========================================
+    // Sequential Logic
+    //=========================================
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            data_reg <= {WIDTH{1'b0}};
+        end else begin
+            data_reg <= data_next;
+        end
+    end
+    
+    //=========================================
+    // Output Assignments
+    //=========================================
+    assign ready_out = 1'b1;
+
+endmodule</code></pre>
+
+        <h2>Combinational Logic</h2>
+
+        <h3>Always Block Style</h3>
+<pre><code>// GOOD: Complete sensitivity, complete assignment
+always @(*) begin
+    case (sel)
+        2'b00: out = a;
+        2'b01: out = b;
+        2'b10: out = c;
+        default: out = d;  // Always have default!
+    endcase
+end
+
+// GOOD: Use default assignment
+always @(*) begin
+    out = 1'b0;  // Default
+    if (condition)
+        out = 1'b1;
+end
+
+// BAD: Creates latch!
+always @(*) begin
+    if (condition)
+        out = 1'b1;
+    // No else! What is out when condition=0?
+end</code></pre>
+
+        <h3>Continuous Assignment</h3>
+<pre><code>// Simple logic - use assign
+assign sum = a + b;
+assign mux_out = sel ? a : b;
+assign and_out = x & y & z;
+
+// Don't use assign for complex logic - hard to read</code></pre>
+
+        <h2>Sequential Logic</h2>
+<pre><code>// Standard synchronous with async reset
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        count <= 4'b0;
+        state <= IDLE;
+    end else begin
+        count <= count + 1;
+        state <= next_state;
+    end
+end
+
+// With synchronous reset
+always @(posedge clk) begin
+    if (sync_rst) begin
+        count <= 4'b0;
+    end else begin
+        count <= count + 1;
+    end
+end
+
+// With enable
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n)
+        data <= 8'b0;
+    else if (enable)
+        data <= data_in;
+end</code></pre>
+
+        <h2>Common Mistakes</h2>
+
+        <h3>1. Mixing Blocking and Non-Blocking</h3>
+<pre><code>// BAD: Mixed in sequential block
+always @(posedge clk) begin
+    temp = a + b;     // Blocking
+    result <= temp;   // Non-blocking - confusing!
+end
+
+// GOOD: All non-blocking in sequential
+always @(posedge clk) begin
+    temp <= a + b;
+    result <= temp;   // Gets OLD value of temp
+end
+
+// OR: Separate combinational and sequential
+wire [7:0] temp = a + b;  // Combinational
+always @(posedge clk)
+    result <= temp;</code></pre>
+
+        <h3>2. Multiple Drivers</h3>
+<pre><code>// BAD: Two always blocks driving same signal
+always @(posedge clk) 
+    if (cond1) out <= a;
+    
+always @(posedge clk)
+    if (cond2) out <= b;  // Conflict!
+
+// GOOD: Single driver
+always @(posedge clk) begin
+    if (cond1)
+        out <= a;
+    else if (cond2)
+        out <= b;
+end</code></pre>
+
+        <h3>3. Incomplete Case Statements</h3>
+<pre><code>// BAD: Missing states create latch
+always @(*) begin
+    case (state)
+        IDLE: out = 1'b0;
+        RUN:  out = 1'b1;
+        // What about other states?
+    endcase
+end
+
+// GOOD: Use default
+always @(*) begin
+    case (state)
+        IDLE: out = 1'b0;
+        RUN:  out = 1'b1;
+        default: out = 1'b0;
+    endcase
+end</code></pre>
+
+        <h2>Parameterization</h2>
+<pre><code>// Parameterized width
+module fifo #(
+    parameter WIDTH = 8,
+    parameter DEPTH = 16,
+    parameter ALMOST_FULL = DEPTH - 2
+)(
+    input                   clk, rst_n,
+    input  [WIDTH-1:0]      din,
+    output [WIDTH-1:0]      dout,
+    output [$clog2(DEPTH):0] count
+);
+    // Use parameters throughout
+    reg [WIDTH-1:0] mem [0:DEPTH-1];
+    
+endmodule
+
+// Instantiation
+fifo #(
+    .WIDTH(32),
+    .DEPTH(64)
+) my_fifo (
+    .clk(clk),
+    .rst_n(rst_n),
+    // ...
+);</code></pre>
+
+        <h2>Generate Statements</h2>
+<pre><code>// Generate multiple instances
+module multi_adder #(
+    parameter N = 4,
+    parameter WIDTH = 8
+)(
+    input  [N*WIDTH-1:0] a,
+    input  [N*WIDTH-1:0] b,
+    output [N*WIDTH-1:0] sum
+);
+    genvar i;
+    generate
+        for (i = 0; i < N; i = i + 1) begin : gen_adder
+            assign sum[i*WIDTH +: WIDTH] = 
+                   a[i*WIDTH +: WIDTH] + 
+                   b[i*WIDTH +: WIDTH];
+        end
+    endgenerate
+endmodule
+
+// Conditional generate
+generate
+    if (USE_FAST_ADDER) begin : fast
+        fast_adder u_add (.a(a), .b(b), .sum(sum));
+    end else begin : slow
+        assign sum = a + b;
+    end
+endgenerate</code></pre>
+
+        <h2>Coding Checklist</h2>
+        <table>
+            <tr><th>Check</th><th>Rule</th></tr>
+            <tr><td>✓</td><td>No latches (check synthesis warnings)</td></tr>
+            <tr><td>✓</td><td>All case statements have default</td></tr>
+            <tr><td>✓</td><td>All if statements have else (or default assignment)</td></tr>
+            <tr><td>✓</td><td>Non-blocking for sequential, blocking for combinational</td></tr>
+            <tr><td>✓</td><td>Single clock edge per always block</td></tr>
+            <tr><td>✓</td><td>Reset initializes all sequential elements</td></tr>
+            <tr><td>✓</td><td>No combinational loops</td></tr>
+            <tr><td>✓</td><td>Proper bit widths (no truncation warnings)</td></tr>
+        </table>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Topic</th><th>Best Practice</th></tr>
+                <tr><td>Sequential</td><td>Non-blocking (<=)</td></tr>
+                <tr><td>Combinational</td><td>Blocking (=) or assign</td></tr>
+                <tr><td>Sensitivity</td><td>Use @(*)</td></tr>
+                <tr><td>Case</td><td>Always have default</td></tr>
+                <tr><td>Reset</td><td>Initialize all FFs</td></tr>
+                <tr><td>Naming</td><td>Consistent, descriptive</td></tr>
+            </table>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="08_Low_Power_Design.html" class="nav-btn prev">← Low Power Design</a>
+            <a href="10_Verification_Basics.html" class="nav-btn next">Verification Basics →</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 9 of 10</p>
+    </div>
+</body>
+</html>

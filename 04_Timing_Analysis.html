@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timing Analysis | Digital Design Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">⚡ Digital Design Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="03_Sequential_Circuits.html">← Prev</a>
+                <a href="05_FSM_Design.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 4 of 10</span>
+            <h1>Timing Analysis</h1>
+            <p class="subtitle">Setup time, hold time, and why your chip might fail</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,156</span> views
+            </div>
+        </div>
+
+        <h2>Why Timing Matters</h2>
+        <p>A logic design that's functionally correct can still fail if timing is wrong.</p>
+        <p>Timing violations cause:</p>
+        <ul>
+            <li>Wrong data captured in flip-flops</li>
+            <li>Metastability (undefined states)</li>
+            <li>Intermittent failures</li>
+            <li>Chips that work at slow speed but fail at target speed</li>
+        </ul>
+
+        <h2>Flip-Flop Timing Parameters</h2>
+
+<div class="diagram">                    Tsetup    Thold
+                   |←──────→||←───→|
+                            ||
+DATA  ━━━━━━━━━━━━━━━━━━━━━━╲╲━━━━━━━━━━━━
+                             ╲╲
+CLK   ────────────────────┬────────────────
+                          │
+                      Clock Edge
+
+        |←──── Tclk_to_q ────→|
+                              |
+OUTPUT ───────────────────────┬────────────
+                              │
+                          New Value</div>
+
+        <h3>Key Timing Parameters</h3>
+        <table>
+            <tr><th>Parameter</th><th>Symbol</th><th>Description</th></tr>
+            <tr><td>Setup Time</td><td>Tsu</td><td>Data must be stable BEFORE clock edge</td></tr>
+            <tr><td>Hold Time</td><td>Th</td><td>Data must be stable AFTER clock edge</td></tr>
+            <tr><td>Clock-to-Q</td><td>Tcq</td><td>Time for output to change after clock</td></tr>
+            <tr><td>Clock Period</td><td>Tclk</td><td>Time between clock edges</td></tr>
+        </table>
+
+        <h2>Setup Time Violation</h2>
+        <p><strong>Data arrives TOO LATE - after the setup window.</strong></p>
+
+<div class="diagram">              │ Tsetup │
+              │←──────→│
+              │        │
+DATA  ────────┴────────┘    ← Data changes too close to edge!
+                    
+CLK   ─────────────────┬─────────
+                       │
+                   Clock Edge
+
+PROBLEM: FF might capture old value or go metastable!</div>
+
+        <h3>Setup Time Equation</h3>
+<pre><code>For data to arrive on time:
+
+  Tcq + Tcomb < Tclk - Tsetup
+
+Where:
+  Tcq   = Clock-to-Q of source FF
+  Tcomb = Combinational logic delay
+  Tclk  = Clock period
+  Tsetup = Setup time of destination FF
+
+Example:
+  Tcq = 0.2ns, Tcomb = 3ns, Tsetup = 0.1ns
+  Tclk must be > 0.2 + 3 + 0.1 = 3.3ns
+  Max frequency = 1/3.3ns = 303 MHz</code></pre>
+
+        <h2>Hold Time Violation</h2>
+        <p><strong>Data changes TOO FAST - before hold window ends.</strong></p>
+
+<div class="diagram">                   │ Thold │
+                   │←─────→│
+                   │       │
+DATA  ─────────────┴───────┘    ← Data changes too soon after edge!
+                    
+CLK   ─────────────┬─────────────
+                   │
+               Clock Edge
+
+PROBLEM: FF captures garbage!</div>
+
+        <h3>Hold Time Equation</h3>
+<pre><code>For hold to be met:
+
+  Tcq + Tcomb > Thold
+
+Where:
+  Tcq   = Clock-to-Q of source FF (min)
+  Tcomb = Combinational logic delay (min)
+  Thold = Hold time of destination FF
+
+If data arrives too fast, add delay buffers!</code></pre>
+
+        <h2>Critical Path</h2>
+        <p><strong>The longest path determines maximum clock frequency.</strong></p>
+
+<div class="diagram">    ┌────┐        ┌─────────────────────┐       ┌────┐
+D ──│ FF │───────►│   Long Logic Path   │──────►│ FF │── Q
+    │  A │        │    (critical!)      │       │  B │
+    └─┬──┘        └─────────────────────┘       └─┬──┘
+      │                                           │
+      └───────────────── CLK ─────────────────────┘
+
+Critical path delay = Tcq_A + Tlogic + Tsetup_B
+
+This limits your max frequency!</div>
+
+        <h3>Finding Critical Path</h3>
+<pre><code>Static Timing Analysis (STA) tools find critical paths:
+
+Path 1: FF_A → AND → OR → MUX → FF_B = 2.5ns
+Path 2: FF_A → BUF → FF_B = 0.5ns           ← Fast (not critical)
+Path 3: FF_C → ADDER → FF_D = 4.2ns         ← CRITICAL PATH!
+
+Max frequency = 1 / (4.2ns + Tsetup) = ~230 MHz</code></pre>
+
+        <h2>Clock Skew</h2>
+        <p><strong>Clock arrives at different times to different flip-flops.</strong></p>
+
+<div class="diagram">Ideal (no skew):
+CLK_A  ─────────────┬───────────
+                    │
+CLK_B  ─────────────┬───────────  (same time)
+
+With skew:
+CLK_A  ─────────────┬───────────
+                    │
+CLK_B  ───────────────────┬─────  (delayed!)
+                    |←───→|
+                     Tskew</div>
+
+        <h3>Positive Skew</h3>
+        <p>Destination clock is delayed. <strong>Helps setup, hurts hold.</strong></p>
+<pre><code>Setup equation with skew:
+  Tcq + Tcomb < Tclk - Tsetup + Tskew  ← Easier to meet!
+
+Hold equation with skew:
+  Tcq + Tcomb > Thold + Tskew          ← Harder to meet!</code></pre>
+
+        <h3>Negative Skew</h3>
+        <p>Destination clock arrives early. <strong>Hurts setup, helps hold.</strong></p>
+
+        <h2>Clock Jitter</h2>
+        <p><strong>Variation in clock edge timing from cycle to cycle.</strong></p>
+
+<div class="diagram">Ideal clock:    Perfect spacing
+    ┌─┐   ┌─┐   ┌─┐   ┌─┐   ┌─┐
+────┘ └───┘ └───┘ └───┘ └───┘ └──
+
+With jitter:    Variable spacing
+    ┌─┐  ┌─┐    ┌─┐  ┌─┐   ┌─┐
+────┘ └──┘ └────┘ └──┘ └───┘ └──
+       |←→|     |←→|
+       Jitter</div>
+
+        <p>Jitter reduces timing margin. Must be accounted for in timing analysis.</p>
+
+        <h2>Timing Paths</h2>
+
+        <h3>Register-to-Register (Reg2Reg)</h3>
+<pre><code>FF → Combinational Logic → FF
+
+Most common path. Constrained by clock period.</code></pre>
+
+        <h3>Input-to-Register (In2Reg)</h3>
+<pre><code>Input Pin → Logic → FF
+
+Constrained by input delay constraint.</code></pre>
+
+        <h3>Register-to-Output (Reg2Out)</h3>
+<pre><code>FF → Logic → Output Pin
+
+Constrained by output delay constraint.</code></pre>
+
+        <h2>Fixing Timing Violations</h2>
+
+        <h3>Setup Violations (Need More Time)</h3>
+        <table>
+            <tr><th>Solution</th><th>How</th></tr>
+            <tr><td>Reduce clock frequency</td><td>Increase clock period</td></tr>
+            <tr><td>Pipeline</td><td>Add FF stages to break long paths</td></tr>
+            <tr><td>Use faster cells</td><td>Low-Vt cells (more power)</td></tr>
+            <tr><td>Optimize logic</td><td>Reduce gate count</td></tr>
+            <tr><td>Better placement</td><td>Reduce wire delay</td></tr>
+        </table>
+
+        <h3>Hold Violations (Path Too Fast)</h3>
+        <table>
+            <tr><th>Solution</th><th>How</th></tr>
+            <tr><td>Add delay buffers</td><td>Insert buffers in path</td></tr>
+            <tr><td>Use slower cells</td><td>High-Vt cells</td></tr>
+            <tr><td>Increase wire length</td><td>Route longer path</td></tr>
+        </table>
+
+        <h2>Timing Report Example</h2>
+<pre><code>Startpoint: reg_a (rising edge-triggered flip-flop)
+Endpoint:   reg_b (rising edge-triggered flip-flop)
+Path Group: clk
+Path Type:  max (setup check)
+
+Point                        Incr   Path
+---------------------------------------------
+clock clk (rise edge)        0.00   0.00
+reg_a/CK (rising edge)       0.05   0.05
+reg_a/Q (Tcq)                0.15   0.20
+U1/Y (AND2)                  0.10   0.30
+U2/Y (OR2)                   0.12   0.42
+U3/Y (MUX2)                  0.18   0.60
+reg_b/D (setup)              0.08   0.68
+data arrival time                   0.68
+
+clock clk (rise edge)        1.00   1.00
+reg_b/CK (clock path)        0.05   1.05
+library setup time          -0.08   0.97
+data required time                  0.97
+
+slack (MET)                         0.29   ← Positive = GOOD!</code></pre>
+
+        <div class="tip">
+            <strong>Slack = Data Required Time - Data Arrival Time</strong><br>
+            Positive slack = Timing met<br>
+            Negative slack = Timing violation!
+        </div>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Concept</th><th>Key Point</th></tr>
+                <tr><td>Setup Time</td><td>Data stable BEFORE clock</td></tr>
+                <tr><td>Hold Time</td><td>Data stable AFTER clock</td></tr>
+                <tr><td>Tcq</td><td>Delay from clock to output</td></tr>
+                <tr><td>Critical Path</td><td>Longest path = max frequency limit</td></tr>
+                <tr><td>Clock Skew</td><td>Clock arrives at different times</td></tr>
+                <tr><td>Slack</td><td>Positive = good, Negative = violation</td></tr>
+            </table>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="03_Sequential_Circuits.html" class="nav-btn prev">← Sequential Circuits</a>
+            <a href="05_FSM_Design.html" class="nav-btn next">FSM Design →</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Digital Design Blog Series | Part 4 of 10</p>
+    </div>
+</body>
+</html>
