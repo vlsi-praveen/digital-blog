@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Design Blog Series</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ Digital Design Blog Series</h1>
+        <p>From Logic Gates to Complex Systems</p>
+        <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+        <div class="view-counter">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            <span class="view-count" id="viewCount">1,247</span> views
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="intro">
+            <h2>Welcome!</h2>
+            <p>This 10-part blog series covers everything you need to master digital design. 
+               From basic gates to timing analysis, FSMs to low power - each post is self-contained 
+               and written in simple language. Start anywhere or read them all!</p>
+        </div>
+        
+        <div class="blog-grid">
+            <a href="01_Digital_Logic_Basics.html" class="blog-card">
+                <div class="blog-number">1</div>
+                <h2>Digital Logic Basics</h2>
+                <p>AND, OR, NOT, XOR gates. Truth tables, Boolean algebra, and logic simplification.</p>
+                <div class="tags">
+                    <span class="tag">Gates</span>
+                    <span class="tag">Boolean</span>
+                    <span class="tag">Basics</span>
+                </div>
+            </a>
+            
+            <a href="02_Combinational_Circuits.html" class="blog-card">
+                <div class="blog-number">2</div>
+                <h2>Combinational Circuits</h2>
+                <p>MUX, Decoder, Encoder, Adders, Comparators. No memory, pure logic.</p>
+                <div class="tags">
+                    <span class="tag">MUX</span>
+                    <span class="tag">Adder</span>
+                    <span class="tag">Decoder</span>
+                </div>
+            </a>
+            
+            <a href="03_Sequential_Circuits.html" class="blog-card">
+                <div class="blog-number">3</div>
+                <h2>Sequential Circuits</h2>
+                <p>Latches, Flip-Flops, Registers, Counters. The building blocks of memory.</p>
+                <div class="tags">
+                    <span class="tag">Flip-Flop</span>
+                    <span class="tag">Counter</span>
+                    <span class="tag">Register</span>
+                </div>
+            </a>
+            
+            <a href="04_Timing_Analysis.html" class="blog-card">
+                <div class="blog-number">4</div>
+                <h2>Timing Analysis</h2>
+                <p>Setup time, hold time, clock-to-Q, critical paths. Why timing matters.</p>
+                <div class="tags">
+                    <span class="tag">Setup</span>
+                    <span class="tag">Hold</span>
+                    <span class="tag">Timing</span>
+                </div>
+            </a>
+            
+            <a href="05_FSM_Design.html" class="blog-card">
+                <div class="blog-number">5</div>
+                <h2>FSM Design</h2>
+                <p>Moore vs Mealy, state encoding, state diagrams. Design any controller.</p>
+                <div class="tags">
+                    <span class="tag">FSM</span>
+                    <span class="tag">Moore</span>
+                    <span class="tag">Mealy</span>
+                </div>
+            </a>
+            
+            <a href="06_Memory_Design.html" class="blog-card">
+                <div class="blog-number">6</div>
+                <h2>Memory Design</h2>
+                <p>SRAM, DRAM, ROM, FIFO, Register Files. How chips remember data.</p>
+                <div class="tags">
+                    <span class="tag">SRAM</span>
+                    <span class="tag">FIFO</span>
+                    <span class="tag">Memory</span>
+                </div>
+            </a>
+            
+            <a href="07_Clock_Domain_Crossing.html" class="blog-card">
+                <div class="blog-number">7</div>
+                <h2>Clock Domain Crossing</h2>
+                <p>Metastability, synchronizers, handshaking, gray codes. Safe CDC design.</p>
+                <div class="tags">
+                    <span class="tag">CDC</span>
+                    <span class="tag">Sync</span>
+                    <span class="tag">Metastability</span>
+                </div>
+            </a>
+            
+            <a href="08_Low_Power_Design.html" class="blog-card">
+                <div class="blog-number">8</div>
+                <h2>Low Power Design</h2>
+                <p>Clock gating, power gating, DVFS, multi-Vt. Reduce power consumption.</p>
+                <div class="tags">
+                    <span class="tag">Power</span>
+                    <span class="tag">Gating</span>
+                    <span class="tag">DVFS</span>
+                </div>
+            </a>
+            
+            <a href="09_RTL_Coding.html" class="blog-card">
+                <div class="blog-number">9</div>
+                <h2>RTL Coding Guidelines</h2>
+                <p>Synthesizable Verilog, common mistakes, best practices for clean RTL.</p>
+                <div class="tags">
+                    <span class="tag">Verilog</span>
+                    <span class="tag">RTL</span>
+                    <span class="tag">Coding</span>
+                </div>
+            </a>
+            
+            <a href="10_Verification_Basics.html" class="blog-card">
+                <div class="blog-number">10</div>
+                <h2>Verification Basics</h2>
+                <p>Testbenches, assertions, coverage, simulation. Verify your design works.</p>
+                <div class="tags">
+                    <span class="tag">Testbench</span>
+                    <span class="tag">Simulation</span>
+                    <span class="tag">Coverage</span>
+                </div>
+            </a>
+        </div>
+        </div>
+
+        <div class="promo-section">
+            <h2>Explore More Blog Series</h2>
+            <div class="promo-grid">
+                <a href="https://vlsi-praveen.github.io/dft-blog" class="promo-card">
+                    <div class="promo-icon"></div>
+                    <h3>DFT Engineering</h3>
+                    <p>Design for Testability - scan chains, ATPG, compression, BIST, JTAG, and production test flows.</p>
+                    <span class="promo-count">11 Part Series</span>
+                </a>
+                <a href="https://vlsi-praveen.github.io/pd-blog" class="promo-card">
+                    <div class="promo-icon"></div>
+                    <h3>Physical Design</h3>
+                    <p>From netlist to GDSII - floorplanning, placement, CTS, routing, timing closure, and signoff.</p>
+                    <span class="promo-count">10 Part Series</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Digital Design Blog Series | By <strong>Praveen Kumar Vagala</strong></p>
+    </div>
+</body>
+</html>
