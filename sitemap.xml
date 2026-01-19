@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/</loc><priority>1.0</priority></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/01_number_systems.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/02_logic_gates.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/03_boolean_algebra.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/04_combinational_circuits.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/05_sequential_circuits.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/06_fsm.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/07_timing_analysis.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/08_memory.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/09_rtl_coding.html</loc></url>
+  <url><loc>https://vlsi-praveen.github.io/digital-blog/10_low_power.html</loc></url>
+</urlset>
